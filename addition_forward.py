@@ -1,74 +1,93 @@
+from ime_fgs import messages
 import numpy as np
 from matplotlib import pyplot as plt
+from ime_fgs.messages import GaussianMixtureMeanCovMessage, GaussianMixtureWeightedMeanInfoMessage
+from scipy.stats import multivariate_normal
 
-def calc_prob_dens(w: np.ndarray, m: np.ndarray, v: np.ndarray, bounds: tuple=(-15, 15)):
+def calc_prob_dens_1d(msg: GaussianMixtureMeanCovMessage, bounds: tuple=(-15, 15)):
     x = np.linspace(*bounds, num=300)
     p = np.zeros(x.shape)
-    n = w.shape[0]
-    d = m.shape[1]
+    n = msg.weights.shape[0]
+    d = msg.mean.shape[1]
 
-    for i, x_i in enumerate(x):
-        for k in range(n):
-            sqrt_k = np.sqrt((2*np.pi)**d * np.linalg.det(v[k, :, :]))
-            exp_k = np.exp(-1/2* (x_i - m[k, :]).T * np.linalg.inv(v[k, :, :]) *(x_i - m[k, :]))
-            p[i] += w[k] / sqrt_k  * exp_k
-
+    for k in range(n):
+        gaussian = multivariate_normal.pdf(x, msg.mean[k, :, :],msg.cov[k, :, :])
+        p[:] += msg.weights[k] * gaussian[0,:]
     return x, p
 
-def add_messages(a, b):
-    wa, ma, va = a
-    wb, mb, vb = b
+def calc_prob_dens_2d(msg: GaussianMixtureMeanCovMessage, bounds: tuple=(-15, 15)):
 
-    na = wa.shape[0]
-    da = ma.shape[1]
-    nb = wb.shape[0]
-    db = ma.shape[1]
-
-    nc = na * nb
-
-    wc = np.kron(wa, wb)
-
-    mc = np.zeros((nc, da))
-    vc = np.zeros((nc, da, da))
-    for i in range(wa.shape[0]):
-        for k in range(wb.shape[0]):
-            mc[i * na + k, :] = ma[i, :] + mb[k, :]
-            vc[i * na + k, :, :] = va[i, :, :] + vb[k, :, :]
-
-    return wc, mc, vc
-
-wa = np.array([0.4, 0.6])
-ma = np.array([[-5], [1]])
-va = np.array([[[1.2]], [[1]]])
-
-a = (wa, ma, va)
-
-wb = np.array([0.1, 0.9])
-mb = np.array([[-2], [5]])
-vb = np.array([[[0.2]], [[4]]])
-
-b = (wb, mb, vb)
-
-c = add_messages(a, b)
-
-xa, pa = calc_prob_dens(*a)
-xb, pb = calc_prob_dens(*b)
+    x, y = np.mgrid[bounds[0]:bounds[1]:.1, bounds[0]:bounds[1]:.1]
+    pos = np.dstack((x, y))
 
 
-xc, pc = calc_prob_dens(*c)
+    p = np.zeros(pos.shape[:2])
 
-inta = ((xa[1] - xa[0]) * pa).sum()
-intb = ((xb[1] - xb[0]) * pb).sum()
-intc = ((xc[1] - xc[0]) * pc).sum()
+    for k in range(msg.weights.shape[0]):
+        print(msg.mean[k, :, :])
+        print(msg.cov[k, :, :])
+        gaussian = multivariate_normal(msg.mean[k, :, :].reshape(2),msg.cov[k, :, :])
+        print(gaussian.pdf(pos).shape)
+        p += msg.weights[k] * gaussian.pdf(pos)
+    return x, p
 
-print(inta, intb, intc)
-plt.subplot(1,3,1)
+
+wa = [[0.4], [0.6]]
+ma = [[[-5],[2]], [[1],[0]]]
+va = [[1.2,0],[0,2]], [[1,1],[0,0.2]]
+
+wb = [[0.1], [0.9]]
+mb = [[[-2],[1]], [[5],[0]]]
+vb = [[0.2,0],[0,3]], [[2,1],[1,1]]
+
+a = GaussianMixtureMeanCovMessage(wa, ma, va)
+b = GaussianMixtureMeanCovMessage(wb, mb, vb)
+c = a + b
+
+d = a.convert(GaussianMixtureWeightedMeanInfoMessage).combine(b.convert(GaussianMixtureWeightedMeanInfoMessage))
+d = d.convert(GaussianMixtureMeanCovMessage)
+
+xa, pa = calc_prob_dens_2d(a)
+xb, pb = calc_prob_dens_2d(b)
+xc, pc = calc_prob_dens_2d(c)
+xd, pd = calc_prob_dens_2d(d)
+
+inta = ((xa[1] - xa[0])**2 * pa).sum()
+intb = ((xb[1] - xb[0])**2 * pb).sum()
+intc = ((xc[1] - xc[0])**2 * pc).sum()
+intd = ((xd[1] - xd[0])**2 * pd).sum()
+
+print(inta, intb, intc,intd)
+
+vmax = np.max([pa.max(),pb.max(),pc.max(), pd.max()])
+plt.subplot(2,2,1)
+plt.title("A message")
+plt.imshow(pa, vmax=vmax)
+plt.subplot(2,2,2)
+plt.title("B message")
+plt.imshow(pb, vmax=vmax)
+plt.subplot(2,2,3)
+plt.title("A+B message")
+plt.imshow(pc, vmax=vmax)
+plt.subplot(2,2,4)
+plt.title("A=B message")
+plt.imshow(pd, vmax=vmax)
+plt.show()
+
+plt.subplot(2,2,1)
 plt.title("A message")
 plt.plot(xa, pa)
-plt.subplot(1,3,2)
+plt.ylim(0,0.25)
+plt.subplot(2,2,2)
 plt.title("B message")
 plt.plot(xb, pb)
-plt.subplot(1,3,3)
+plt.ylim(0,0.25)
+plt.subplot(2,2,3)
 plt.title("A+B message")
 plt.plot(xc, pc)
+plt.ylim(0,0.25)
+plt.subplot(2,2,4)
+plt.title("A=B message")
+plt.plot(xd, pd)
+plt.ylim(0,0.25)
 plt.show()
