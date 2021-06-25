@@ -1,0 +1,6 @@
+[run]
+omit = ime_fgs/demos/*,ime_fgs/tests/*
+source = ime_fgs/
+
+[html]
+directory = coverage_html_report

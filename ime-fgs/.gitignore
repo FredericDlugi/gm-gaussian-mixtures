@@ -1,0 +1,14 @@
+*.idea
+*.bak
+*~
+*.pyc
+__pycache__/
+dist/
+ime_fgs.egg-info/
+ime_fgs/demos/divergence_measures/particle_list.py
+ime_fgs/demos/divergence_measures/1d_minimize_alpha_divergence_heuristic.py
+coverage_html_report/
+.coverage
+*.orig
+venv/
+.pytest_cache/
