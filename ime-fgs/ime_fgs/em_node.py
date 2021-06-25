@@ -7,7 +7,7 @@
 # Institute for Electrical Engineering in Medicine
 #
 from ime_fgs.base import NodePort
-from numpy import asarray, atleast_2d, linspace, inf, identity, transpose, kron, trace
+from numpy import asarray, atleast_2d, linspace, inf, identity, transpose, kron, trace, shape
 from numpy.random import normal, seed
 
 import time

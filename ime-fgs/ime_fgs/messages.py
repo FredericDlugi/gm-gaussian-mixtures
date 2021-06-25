@@ -9,9 +9,6 @@
 
 from __future__ import annotations
 
-from numpy import ndim, all, array, shape, allclose, atleast_2d, dstack, ndarray, zeros, inf, concatenate
-from numpy.linalg import inv, svd
-
 import numpy as np
 import math
 
@@ -19,6 +16,7 @@ from ime_fgs.unscented_utils import unscented_transform_gaussian
 from ime_fgs.divergence_measures import moment_matched_mean_cov_of_doubly_truncated_gaussian, \
     moment_matched_weighted_mean_info_of_doubly_truncated_gaussian
 from ime_fgs.utils import inherit_method_docs, col_vec, mat, try_inv_else_robinv
+
 from abc import ABC, abstractmethod
 from enum import Enum
 
@@ -40,7 +38,7 @@ class Message(ABC):
         assert isinstance(direction, PortMessageDirection)
         self.direction = direction
 
-    def convert(self, target_type):
+    def convert(self, target_type) -> Message:
         """
         Convert this message to another message type.
 
@@ -50,7 +48,7 @@ class Message(ABC):
         raise NotImplementedError('Convert method not implemented for this datatype.')
 
     @abstractmethod
-    def combine(self, msg_b, auto_convert=False, try_other=True):
+    def combine(self, msg_b, auto_convert=False, try_other=True) -> Message:
         """
         Combine the information from this message with information from another message.
 
@@ -124,10 +122,10 @@ class GaussianMeanCovMessage(Message):
         :param direction:
         """
         super().__init__(direction)
-        self.mean = array(mean)
-        self.cov = array(cov)
-        # assert allclose(self.cov, self.cov.T)
-        assert ndim(self.mean) == ndim(self.cov) == 2
+        self.mean = np.array(mean)
+        self.cov = np.array(cov)
+        # assert np.allclose(self.cov, self.cov.T)
+        assert np.ndim(self.mean) == np.ndim(self.cov) == 2
         assert self.mean.shape[0] == self.cov.shape[0] == self.cov.shape[1]
         assert self.mean.shape[1] == 1
 
@@ -161,7 +159,7 @@ class GaussianMeanCovMessage(Message):
         elif target_type is GaussianWeightedMeanInfoMessage:
             if self.is_degenerate():
                 raise NotImplementedError
-            info = inv(self.cov)
+            info = np.linalg.inv(self.cov)
             weighted_mean = info @ self.mean
             return GaussianWeightedMeanInfoMessage(weighted_mean, info)
 
@@ -175,7 +173,7 @@ class GaussianMeanCovMessage(Message):
             if self.is_non_informative():
                 return GaussianMixtureWeightedMeanInfoMessage.non_informative(1, self.cov.shape[1])
             else:
-                info = inv(self.cov)
+                info = np.linalg.inv(self.cov)
                 weighted_mean = info @ self.mean
                 return GaussianMixtureWeightedMeanInfoMessage([[1]], [weighted_mean], [info])
         else:
@@ -185,7 +183,7 @@ class GaussianMeanCovMessage(Message):
         if inverse:
             raise NotImplementedError('Backward multiplication is unimplemented for this data type (inefficient)')
         else:
-            matrix = atleast_2d(matrix)
+            matrix = np.atleast_2d(matrix)
             matrix_h = matrix.transpose().conj()
             mean = matrix @ self.mean
             cov = matrix @ self.cov @ matrix_h
@@ -194,20 +192,20 @@ class GaussianMeanCovMessage(Message):
 
     @staticmethod
     def non_informative(n, direction=PortMessageDirection.Undefined, inf_approx=None):
-        mean = zeros((n, 1))
-        cov = zeros((n, n))
+        mean = np.zeros((n, 1))
+        cov = np.zeros((n, n))
         for i in range(0, n):
             if inf_approx is not None:
                 cov[i, i] = inf_approx
             else:
-                cov[i, i] = inf
+                cov[i, i] = np.inf
         return GaussianMeanCovMessage(mean, cov, direction=direction)
 
     def is_non_informative(self):
         return all(self.cov == self.non_informative(self.cov.shape[0]).cov)
 
     def is_degenerate(self):
-        _, eigs, _ = svd(self.cov)
+        _, eigs, _ = np.linalg.svd(self.cov)
         return eigs[-1] == 0
 
     def unscented_transform(self, func, sigma_point_scheme=None, alpha=None):
@@ -231,8 +229,8 @@ class GaussianMeanCovMessage(Message):
     @staticmethod
     def get_means(list_of_GMC_msgs):
         assert all([isinstance(msg, GaussianMeanCovMessage) for msg in list_of_GMC_msgs])
-        means = array(concatenate([msg.mean for msg in list_of_GMC_msgs], axis=1))
-        assert isinstance(means, ndarray)
+        means = np.array( np.concatenate([msg.mean for msg in list_of_GMC_msgs], axis=1))
+        assert isinstance(means, np.ndarray)
         N = list_of_GMC_msgs[0].mean.shape[0]
         assert means.shape == (N, len(list_of_GMC_msgs))
         return means
@@ -240,8 +238,8 @@ class GaussianMeanCovMessage(Message):
     @staticmethod
     def get_covs(list_of_GMC_msgs):
         assert all([isinstance(msg, GaussianMeanCovMessage) for msg in list_of_GMC_msgs])
-        covs = dstack([msg.cov for msg in list_of_GMC_msgs])
-        assert isinstance(covs, ndarray)
+        covs = np.dstack([msg.cov for msg in list_of_GMC_msgs])
+        assert isinstance(covs, np.ndarray)
         N = list_of_GMC_msgs[0].mean.shape[0]
         assert covs.shape == (N, N, len(list_of_GMC_msgs))
         return covs
@@ -263,14 +261,14 @@ class GaussianMeanCovMessage(Message):
     def __eq__(self, other):
         """Override the default Equals behavior"""
         if isinstance(other, self.__class__):
-            return allclose(self.mean, other.mean) and allclose(self.cov, other.cov)
+            return np.allclose(self.mean, other.mean) and np.allclose(self.cov, other.cov)
         return NotImplemented
 
     def __truediv__(self, other):
         if isinstance(other, self.__class__):
-            info_dividend = inv(self.cov)
-            info_divisor = inv(other.cov)
-            cov = inv(info_dividend - info_divisor)
+            info_dividend = np.linalg.inv(self.cov)
+            info_divisor = np.linalg.inv(other.cov)
+            cov = np.linalg.inv(info_dividend - info_divisor)
             # if cov < 0:
             #     raise NotImplementedError( '''Negative covariances do not make sense.''' )
             mean = cov @ (info_dividend @ self.mean - info_divisor @ other.mean)
@@ -295,11 +293,11 @@ class GaussianWeightedMeanInfoMessage(Message, MultipleCombineMessage):
         :param direction:
         """
         super().__init__(direction)
-        self.weighted_mean = array(weighted_mean)
-        self.info = array(info)
+        self.weighted_mean = np.array(weighted_mean)
+        self.info = np.array(info)
         self.info = (self.info + self.info.T) / 2
-        # assert allclose(self.info, self.info.T)
-        assert ndim(self.weighted_mean) == 2 == ndim(self.info)
+        # assert np.allclose(self.info, self.info.T)
+        assert np.ndim(self.weighted_mean) == 2 == np.ndim(self.info)
         assert self.weighted_mean.shape[0] == self.info.shape[0] == self.info.shape[1]
         assert self.weighted_mean.shape[1] == 1
 
@@ -314,7 +312,7 @@ class GaussianWeightedMeanInfoMessage(Message, MultipleCombineMessage):
                     else:
                         raise NotImplementedError
 
-            assert shape(self.weighted_mean) == shape(msg_b.weighted_mean)
+            assert self.weighted_mean.shape == msg_b.weighted_mean.shape
 
             weighted_mean = self.weighted_mean + msg_b.weighted_mean
             info = self.info + msg_b.info
@@ -343,7 +341,7 @@ class GaussianWeightedMeanInfoMessage(Message, MultipleCombineMessage):
             if self.is_non_informative():
                 return GaussianMeanCovMessage.non_informative(self.info.shape[0])
             else:
-                cov = inv(self.info)
+                cov = np.linalg.inv(self.info)
                 mean = cov @ self.weighted_mean
                 return GaussianMeanCovMessage(mean, cov)
 
@@ -351,7 +349,7 @@ class GaussianWeightedMeanInfoMessage(Message, MultipleCombineMessage):
             if self.is_non_informative():
                 return GaussianMixtureMeanCovMessage.non_informative(1, self.info.shape[1])
             else:
-                cov = inv(self.info)
+                cov = np.linalg.inv(self.info)
                 mean = cov @ self.weighted_mean
                 return GaussianMixtureMeanCovMessage([[1]], [mean], [cov])
 
@@ -372,7 +370,7 @@ class GaussianWeightedMeanInfoMessage(Message, MultipleCombineMessage):
     def multiply_deterministic(self, matrix, inverse=False):
 
         if inverse:
-            matrix = atleast_2d(matrix)
+            matrix = np.atleast_2d(matrix)
             matrix_h = matrix.transpose().conj()
             weighted_mean = matrix_h @ self.weighted_mean
             info = matrix_h @ self.info @ matrix
@@ -388,8 +386,8 @@ class GaussianWeightedMeanInfoMessage(Message, MultipleCombineMessage):
 
     @staticmethod
     def non_informative(n, direction=PortMessageDirection.Undefined, inf_approx=None):
-        weighted_mean = zeros((n, 1))
-        info = zeros((n, n))
+        weighted_mean = np.zeros((n, 1))
+        info = np.zeros((n, n))
         if inf_approx is not None:
             for i in range(0, n):
                 info[i, i] = 1 / inf_approx
@@ -423,7 +421,7 @@ class GaussianWeightedMeanInfoMessage(Message, MultipleCombineMessage):
     def __eq__(self, other):
         """Override the default Equals behavior"""
         if isinstance(other, self.__class__):
-            return allclose(self.weighted_mean, other.weighted_mean) and allclose(self.info, other.info)
+            return np.allclose(self.weighted_mean, other.weighted_mean) and np.allclose(self.info, other.info)
         return NotImplemented
 
     def __truediv__(self, other):
@@ -455,8 +453,8 @@ class GaussianTildeMessage(Message):
         super().__init__(direction)
         self.xi = col_vec(xi)
         self.W = mat(W)
-        assert allclose(self.W, self.W.T)
-        assert ndim(self.xi) == 2 == ndim(self.W)
+        assert np.allclose(self.W, self.W.T)
+        assert np.ndim(self.xi) == 2 == np.ndim(self.W)
         assert self.xi.shape[0] == self.W.shape[0] == self.W.shape[1]
         assert self.xi.shape[1] == 1
 
@@ -510,7 +508,7 @@ class GaussianTildeMessage(Message):
 
     def multiply_deterministic(self, matrix, inverse=False):
         if inverse:
-            matrix = atleast_2d(matrix)
+            matrix = np.atleast_2d(matrix)
             matrix_h = matrix.transpose().conj()
             xi = matrix_h @ self.xi
             W = matrix_h @ self.W @ matrix
@@ -523,8 +521,8 @@ class GaussianTildeMessage(Message):
 
     @staticmethod
     def non_informative(n, direction=PortMessageDirection.Undefined, inf_approx=None):
-        xi = zeros(n)
-        W = zeros((n, n))
+        xi = np.zeros(n)
+        W = np.zeros((n, n))
         if inf_approx is not None:
             for i in range(0, n):
                 W[i, i] = 1 / inf_approx
@@ -545,7 +543,7 @@ class GaussianTildeMessage(Message):
     def __eq__(self, other):
         """Override the default Equals behavior"""
         if isinstance(other, self.__class__):
-            return allclose(self.xi, other.xi) and allclose(self.W, other.W)
+            return np.allclose(self.xi, other.xi) and np.allclose(self.W, other.W)
         return NotImplemented
 
     def __truediv__(self, other):
@@ -837,7 +835,7 @@ class GaussianMixtureMeanCovMessage(Message):
                     mean[l, :, :] = cov[l, :, :] @ (info_dividend @ self.mean[i, :, :] - info_divisor @ other.mean[k, :, :])
                     l += 1
 
-            return GaussianMixtureMeanCovMessage(mean, cov)
+            return GaussianMixtureMeanCovMessage(weights, mean, cov)
         else:
             raise NotImplementedError
 
@@ -1056,6 +1054,8 @@ class GaussianMixtureWeightedMeanInfoMessage(Message, MultipleCombineMessage):
                     weights[l] = self.weights[i] * other.weights[k]
                     weighted_mean[l, :, :] = self.weighted_mean[i, :, :] - other.weighted_mean[k, :, :]
                     info[l, :, :] = self.info[i, :, :] - other.info[k, :, :]
+                    l += 1
+
             return GaussianMixtureWeightedMeanInfoMessage(weights, weighted_mean, info)
         else:
             raise NotImplementedError
