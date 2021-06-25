@@ -10,7 +10,7 @@ def calc_prob_dens(w: np.ndarray, m: np.ndarray, v: np.ndarray, bounds: tuple=(-
     for i, x_i in enumerate(x):
         for k in range(n):
             sqrt_k = np.sqrt((2*np.pi)**d * np.linalg.det(v[k, :, :]))
-            exp_k = np.exp(-1/2* (x_i - m[k, :]).T * (1/v[k, :, :]) *(x_i - m[k, :]))
+            exp_k = np.exp(-1/2* (x_i - m[k, :]).T * np.linalg.inv(v[k, :, :]) *(x_i - m[k, :]))
             p[i] += w[k] / sqrt_k  * exp_k
 
     return x, p
