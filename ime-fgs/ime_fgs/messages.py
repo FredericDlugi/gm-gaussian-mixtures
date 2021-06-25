@@ -164,6 +164,20 @@ class GaussianMeanCovMessage(Message):
             info = inv(self.cov)
             weighted_mean = info @ self.mean
             return GaussianWeightedMeanInfoMessage(weighted_mean, info)
+
+        elif target_type is GaussianMixtureMeanCovMessage:
+            if self.is_non_informative():
+                return GaussianMixtureMeanCovMessage.non_informative(1, self.cov.shape[1])
+            else:
+                return GaussianMixtureMeanCovMessage([[1]], [self.mean], [self.cov])
+
+        elif target_type is GaussianMixtureWeightedMeanInfoMessage:
+            if self.is_non_informative():
+                return GaussianMixtureWeightedMeanInfoMessage.non_informative(1, self.cov.shape[1])
+            else:
+                info = inv(self.cov)
+                weighted_mean = info @ self.mean
+                return GaussianMixtureWeightedMeanInfoMessage([[1]], [weighted_mean], [info])
         else:
             raise NotImplementedError('This kind of message type conversion has not been implemented yet.')
 
@@ -332,6 +346,21 @@ class GaussianWeightedMeanInfoMessage(Message, MultipleCombineMessage):
                 cov = inv(self.info)
                 mean = cov @ self.weighted_mean
                 return GaussianMeanCovMessage(mean, cov)
+
+        elif target_type is GaussianMixtureMeanCovMessage:
+            if self.is_non_informative():
+                return GaussianMixtureMeanCovMessage.non_informative(1, self.info.shape[1])
+            else:
+                cov = inv(self.info)
+                mean = cov @ self.weighted_mean
+                return GaussianMixtureMeanCovMessage([[1]], [mean], [cov])
+
+        elif target_type is GaussianMixtureWeightedMeanInfoMessage:
+            if self.is_non_informative():
+                return GaussianMixtureWeightedMeanInfoMessage.non_informative(1, self.info.shape[1])
+            else:
+                return GaussianMixtureWeightedMeanInfoMessage([[1]], [self.weighted_mean], [self.info])
+
         elif target_type is GaussianTildeMessage:
             if self.is_non_informative():
                 return GaussianTildeMessage.non_informative(self.info.shape[0])
