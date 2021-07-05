@@ -698,12 +698,12 @@ class GaussianMixtureMeanCovMessage(Message):
             matrix = np.atleast_2d(matrix)
             matrix_h = matrix.transpose().conj()
 
-            mean = np.zeros(self.mean.shape)
-            cov = np.zeros(self.cov.shape)
+            mean = []
+            cov = []
 
             for i in range(self.weights.shape[0]):
-                mean[i,:,:] = matrix @ self.mean[i,:,:]
-                cov[i,:,:] = matrix @ self.cov[i,:,:] @ matrix_h
+                mean += [matrix @ self.mean[i,:,:]]
+                cov += [matrix @ self.cov[i,:,:] @ matrix_h]
 
             return GaussianMixtureMeanCovMessage(self.weights.copy(), mean, cov)
 
@@ -972,12 +972,12 @@ class GaussianMixtureWeightedMeanInfoMessage(Message, MultipleCombineMessage):
             matrix = np.atleast_2d(matrix)
             matrix_h = matrix.transpose().conj()
 
-            weighted_mean = np.zeros(self.weighted_mean.shape)
-            info = np.zeros(self.info.shape)
+            weighted_mean = []
+            info = []
 
             for i in range(self.weights.shape[0]):
-                weighted_mean[i,:,:] = matrix_h @ self.weighted_mean[i,:,:]
-                info[i,:,:] = matrix_h @ self.info[i,:,:] @ matrix
+                weighted_mean += [matrix_h @ self.weighted_mean[i,:,:]]
+                info += [matrix_h @ self.info[i,:,:] @ matrix]
 
             return GaussianMixtureWeightedMeanInfoMessage(self.weights.copy(), weighted_mean, info)
 

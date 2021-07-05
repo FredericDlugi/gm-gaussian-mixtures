@@ -10,7 +10,8 @@ from ime_fgs.base import NodePort
 from numpy import atleast_2d
 
 from ime_fgs.base import Node, NodePortType
-from ime_fgs.messages import MultipleCombineMessage
+from ime_fgs.messages import GaussianMixtureMeanCovMessage, MultipleCombineMessage
+from ime_fgs.gaussian_mixture_reduction import reduction_algorithm
 
 
 class EqualityNode(Node):
@@ -181,6 +182,51 @@ class MatrixNode(Node):
             name = self.name
 
         return type(self).__name__ + "(" + name + ", Matrix:" + repr(self.matrix.tolist()) + ")"
+
+    def get_ports(self):
+        return [self.port_a, self.port_b]
+
+class ReductionNode(Node):
+    """
+      a +---------------+ b
+    --->| ReductionNode |--->
+        +---------------+
+    """
+
+    def __init__(self, num_weights, name=None):
+        super().__init__(name=name)
+
+        self.port_a = NodePort(self, self._calc_msg_a, NodePortType.InPort)
+        self.port_b = NodePort(self, self._calc_msg_b, NodePortType.OutPort)
+        self._num_weights = num_weights
+
+    @property
+    def num_weights(self):
+        return self._num_weights
+
+    @num_weights.setter
+    def num_weights(self, num_weights):
+        self._num_weights = num_weights
+
+    def _calc_msg_a(self):
+        if isinstance(self.port_b.in_msg, GaussianMixtureMeanCovMessage):
+            return reduction_algorithm(self.port_b.in_msg, self._num_weights)
+        else:
+            return self.port_b.in_msg
+
+    def _calc_msg_b(self):
+        if isinstance(self.port_a.in_msg, GaussianMixtureMeanCovMessage):
+            return reduction_algorithm(self.port_a.in_msg, self._num_weights)
+        else:
+            return self.port_a.in_msg
+
+    def __repr__(self):
+        if self.name is None:
+            name = str(id(self))
+        else:
+            name = self.name
+
+        return type(self).__name__ + "(" + name + ", Num Weights:" + self._num_weights + ")"
 
     def get_ports(self):
         return [self.port_a, self.port_b]
