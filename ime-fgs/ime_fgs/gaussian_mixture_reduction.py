@@ -44,7 +44,8 @@ def reduction_algorithm(msg: GaussianMixtureMeanCovMessage, num_weights: int):
         dist_matrix = new_dist_matrix
     weights /= np.sum(weights)
 
-    return GaussianMixtureMeanCovMessage(weights, mean, cov)
+    sorted_index = np.argsort(-weights, 0).reshape(-1)
+    return GaussianMixtureMeanCovMessage(weights[sorted_index, :], np.array(mean)[sorted_index, :, :], np.array(cov)[sorted_index, :, :])
 
 def distance_measure(gausi, gausj):
     wi, _, pi = gausi
